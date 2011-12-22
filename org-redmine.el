@@ -219,9 +219,22 @@ Example.
 ;;------------------------------
 (defun org-redmine-curl-get (uri)
   ""
-  (ignore-errors (kill-buffer org-redmine-curl-buffer))
+  (org-redmine-curl uri "GET" nil))
+
+(defun org-redmine-curl-post (uri data)
+  ""
+  (org-redmine-curl uri "POST" data))
+
+(defun org-redmine-curl (uri method data)
+  ""
+  (list 'call-process "curl" nil `(,org-redmine-curl-buffer nil) nil
+                       (org-redmine-curl-args uri method data)))
+
+(defun org-redmine-curl (uri method data)
+  ""
+  (ignore-errors (kill-buffer org-redmine-curl-buffer))  
   (unless (eq 0 (apply 'call-process "curl" nil `(,org-redmine-curl-buffer nil) nil
-                       (org-redmine-curl-args uri)
+                       (org-redmine-curl-args uri method data)
                        ))
     (signal 'org-redmine-exception-not-retrieved "The requested URL returned error"))
   (save-current-buffer
@@ -234,13 +247,19 @@ Example.
          (message "%s: Non JSON data because of a server side exception. See %s"
                   (error-message-string err) org-redmine-curl-buffer))))))
 
-(defun org-redmine-curl-args (uri)
-  (let ((args '("-X" "GET" "-s" "-f")))
+
+(defun org-redmine-curl-args (uri method &optional data)
+  "Method is GET or POST string  "
+  (let ((args `("-X" ,method "-s" "-f" )))
     (append
      args
+     (cond (data
+            `("-d" ,data "-H"  "Content-Type: application/json"))
+           (t ""))
      (cond (org-redmine-auth-api-key
-            `("-d"
-              ,(format "key=%s" org-redmine-auth-api-key)))
+            `("-H"
+              ,(format "X-Redmine-API-Key: %s" org-redmine-auth-api-key)))
+           
            (org-redmine-auth-username
             `("-u"
               ,(format "%s:%s"
@@ -471,4 +490,44 @@ Example.
                   . (lambda (issue) (org-redmine-insert-subtree issue)))))))
    ))
 
+
+;;------------------------------
+;; Org-redmine clock-out hook
+;;------------------------------
+
+(defun new-time-entry-json (issue-id hours activity-id comments)
+  (format
+   (concat "{\"time_entry\": "
+           "  {\"issue_id\": \"%s\","
+           "  \"hours\": \"%f\", "
+           "  \"activity_id\": \"%i\", "
+           "  \"comments\": \"%s\"}"
+           "}")
+   issue-id hours activity-id comments))
+
+(defun org-redmine-clock-out-hook ()
+  (let ((title (org-clock-get-clock-string))
+        (id nil)
+        (currently-clocked-time
+         (/ (floor (- (org-float-time)
+                      (org-float-time org-clock-start-time)) 60)
+            60.0)
+         ))
+    (when (string-match "#[0-9]+" title)
+      (setq id (substring title (+ 1 (match-beginning 0)) (match-end 0)))
+      (org-redmine-curl-post
+       (concat org-redmine-uri "/time_entries.json")       
+       (new-time-entry-json (string-to-number id) 
+                            currently-clocked-time
+                            org-redimne-activity
+                            "Auto clock out from emacs"))
+      )))
+
+;; (org-redmine-curl-post (concat org-redmine-uri "/time_entries.json" "")
+;;                        (new-time-entry-json 1407 0.5 org-redimne-default-activity "Это проверочка"))
+
+
 (provide 'org-redmine)
+
+(provide 'org-redmine)
+
