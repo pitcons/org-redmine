@@ -505,6 +505,9 @@ Example.
            "}")
    issue-id hours activity-id comments))
 
+(defun org-redmine-clock-out-comment ()
+  org-clock-heading)
+
 (defun org-redmine-clock-out-hook ()
   (let ((title (org-clock-get-clock-string))
         (id nil)
@@ -516,18 +519,17 @@ Example.
     (when (string-match "#[0-9]+" title)
       (setq id (substring title (+ 1 (match-beginning 0)) (match-end 0)))
       (org-redmine-curl-post
-       (concat org-redmine-uri "/time_entries.json")       
-       (new-time-entry-json (string-to-number id) 
+       (concat org-redmine-uri "/time_entries.json")
+       (new-time-entry-json (string-to-number id)
                             currently-clocked-time
-                            org-redimne-activity
-                            "Auto clock out from emacs"))
+                            org-redimne-activity                            
+                            (org-redmine-clock-out-comment)
+                            ))
       )))
 
 ;; (org-redmine-curl-post (concat org-redmine-uri "/time_entries.json" "")
-;;                        (new-time-entry-json 1407 0.5 org-redimne-default-activity "Это проверочка"))
-
-
-(provide 'org-redmine)
+;;                        (new-time-entry-json 1407 0.5
+;;                        org-redimne-default-activity "Thi is is test"))
 
 (provide 'org-redmine)
 
